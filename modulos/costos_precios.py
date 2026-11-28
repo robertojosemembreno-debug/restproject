@@ -93,7 +93,7 @@ def render():
             st.info("Aún no hay productos registrados.")
         else:
             opciones = {f"{row['codigo']} - {row['nombre']}": row for _, row in df_prod.iterrows()}
-            seleccion = st.selectbox("Selecciona un producto para actualizar:", list(opciones.keys()))
+            seleccion = st.selectbox("Selecciona un producto o ingrediente:", list(opciones.keys()))
             prod = opciones[seleccion]
 
             c1, c2, c3 = st.columns(3)
@@ -130,6 +130,22 @@ def render():
                 """, (nuevo_costo, nueva_merma, nuevo_margen, 1 if nuevo_isv else 0, nuevo_precio, ahora, int(prod["id"])))
                 conn.commit()
                 st.success("Precios y costos actualizados.")
+                st.rerun()
+
+            st.divider()
+            st.subheader("🗑️ Eliminar Producto o Ingrediente")
+            confirmar_borrar = st.checkbox(
+                f"Confirmo eliminar '{prod['codigo']} - {prod['nombre']}' y sus vínculos en recetas y movimientos.",
+                key="confirm_borrar_prod",
+            )
+            if st.button("Eliminar Definitivamente", disabled=not confirmar_borrar):
+                prod_id = int(prod["id"])
+                cur = conn.cursor()
+                cur.execute("DELETE FROM recetas WHERE platillo_id = ? OR insumo_id = ?", (prod_id, prod_id))
+                cur.execute("DELETE FROM movimientos_inventario WHERE producto_id = ?", (prod_id,))
+                cur.execute("DELETE FROM productos WHERE id = ?", (prod_id,))
+                conn.commit()
+                st.success(f"Se eliminó '{prod['nombre']}' del sistema.")
                 st.rerun()
 
     with tab3:
