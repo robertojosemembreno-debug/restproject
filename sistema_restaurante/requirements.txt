@@ -1,6 +1,0 @@
-streamlit
-pandas
-python-barcode
-pillow
-reportlab
-openpyxl
