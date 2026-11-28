@@ -171,10 +171,10 @@ def render():
 
             with st.form("form_receta"):
                 c1, c2 = st.columns([2, 1])
-                sel_insumo = c1.selectbox("2. Insumo / Consumible que utiliza:", list(op_insumos.keys()))
+                sel_insumo = c1.selectbox("2. Agregar Insumo / Consumible:", list(op_insumos.keys()))
                 cant_req = c2.number_input("Cantidad por cada platillo:", min_value=0.001, value=1.0, step=0.1, format="%.3f")
 
-                if st.form_submit_button("Agregar / Actualizar en Receta", type="primary"):
+                if st.form_submit_button("➕ Agregar a la Receta", type="primary"):
                     insumo = op_insumos[sel_insumo]
                     cur = conn.cursor()
                     cur.execute("""
@@ -206,8 +206,7 @@ def render():
                 costo_receta = float(df_receta["subtotal_costo"].sum())
                 st.markdown(f"**Costo total de consumibles por unidad:** `L {costo_receta:,.2f}`")
 
-                c_btn1, c_btn2 = st.columns(2)
-                if c_btn1.button("Aplicar costo de receta al platillo"):
+                if st.button("Aplicar costo de receta al platillo"):
                     ahora = datetime.now().strftime("%Y-%m-%d %H:%M")
                     _, _, precio_sug = calcular_precio(
                         costo_receta, float(platillo["merma_pct"]), float(platillo["margen_pct"]), bool(platillo["aplica_isv"])
@@ -221,16 +220,47 @@ def render():
                     st.success(f"Costo base actualizado a L {costo_receta:,.2f} y precio sugerido a L {precio_sug:,.2f}.")
                     st.rerun()
 
-                eliminar_op = c_btn2.selectbox(
-                    "Quitar consumible:",
-                    ["-- Seleccionar --"] + [f"{r['id']} - {r['consumible']}" for _, r in df_receta.iterrows()],
-                    label_visibility="collapsed",
+                st.divider()
+                st.markdown("**✏️ Editar o 🗑️ Eliminar Consumible de esta Receta**")
+                op_items_receta = {
+                    f"{r['codigo']} - {r['consumible']} (Actual: {r['cantidad_requerida']} {r['unidad']})": r
+                    for _, r in df_receta.iterrows()
+                }
+                sel_item_rec = st.selectbox(
+                    "Selecciona el consumible a modificar o quitar:",
+                    list(op_items_receta.keys()),
+                    key="sel_edit_receta",
                 )
-                if eliminar_op != "-- Seleccionar --":
-                    rec_id = int(eliminar_op.split(" - ")[0])
+                item_rec = op_items_receta[sel_item_rec]
+
+                col_ed1, col_ed2, col_ed3 = st.columns([2, 1, 1])
+                nueva_cant_rec = col_ed1.number_input(
+                    f"Nueva cantidad ({item_rec['unidad']}):",
+                    min_value=0.001,
+                    value=float(item_rec["cantidad_requerida"]),
+                    step=0.1,
+                    format="%.3f",
+                    key=f"cant_rec_{int(item_rec['id'])}",
+                )
+                col_ed2.write("")
+                col_ed2.write("")
+                if col_ed2.button("💾 Guardar Cantidad", key=f"btn_save_rec_{int(item_rec['id'])}"):
                     cur = conn.cursor()
-                    cur.execute("DELETE FROM recetas WHERE id = ?", (rec_id,))
+                    cur.execute(
+                        "UPDATE recetas SET cantidad_requerida = ? WHERE id = ?",
+                        (float(nueva_cant_rec), int(item_rec["id"])),
+                    )
                     conn.commit()
+                    st.success(f"Cantidad de '{item_rec['consumible']}' actualizada a {nueva_cant_rec} {item_rec['unidad']}.")
+                    st.rerun()
+
+                col_ed3.write("")
+                col_ed3.write("")
+                if col_ed3.button("🗑️ Quitar de Receta", key=f"btn_del_rec_{int(item_rec['id'])}"):
+                    cur = conn.cursor()
+                    cur.execute("DELETE FROM recetas WHERE id = ?", (int(item_rec["id"]),))
+                    conn.commit()
+                    st.success(f"Se quitó '{item_rec['consumible']}' de la receta.")
                     st.rerun()
 
     st.divider()
